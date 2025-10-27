@@ -2,6 +2,7 @@
 // Adds a simple message list and input. Replace the mock reply logic with a real backend or connect to the voice agent when ready.
 
 import React, { useRef, useState } from "react";
+import { useConversationContext } from "@/context/ConversationContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -29,19 +30,42 @@ export const Chat: React.FC = () => {
     setMessages((s) => [...s, userMsg]);
     setDraft("");
 
-    // Mock bot reply (replace with real API call)
-    setTimeout(() => {
+    // Use the shared ConversationContext to send text when possible
+    const { sendText } = useConversationContext();
+    sendText(userMsg.text).catch((e) => {
+      console.warn("sendText failed, fallback to mock", e);
+      setTimeout(() => {
+        const botMsg: Message = {
+          id: String(Date.now()) + "-b",
+          sender: "bot",
+          text: `Echo: ${userMsg.text}`,
+          time: new Date().toLocaleTimeString(),
+        };
+        setMessages((s) => [...s, botMsg]);
+        listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+      }, 600);
+    });
+  };
+
+  // Listen for incoming messages from the voice agent (published by VoiceAgent)
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail: any = (e as CustomEvent).detail;
+      if (!detail || !detail.message) return;
+      const payload = detail.message;
       const botMsg: Message = {
         id: String(Date.now()) + "-b",
         sender: "bot",
-        text: `Echo: ${userMsg.text}`,
+        text: payload.text ?? JSON.stringify(payload),
         time: new Date().toLocaleTimeString(),
       };
       setMessages((s) => [...s, botMsg]);
-      // scroll to bottom
       listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-    }, 600);
-  };
+    };
+
+    window.addEventListener("tavoc:message", handler as EventListener);
+    return () => window.removeEventListener("tavoc:message", handler as EventListener);
+  }, []);
 
   return (
     <div className="border border-input rounded-2xl p-4 bg-card shadow-card">

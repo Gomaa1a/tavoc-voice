@@ -1,6 +1,7 @@
 import { useConversation } from "@11labs/react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useConversationContext } from "@/context/ConversationContext";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,8 +33,27 @@ export const VoiceAgent = () => {
     },
     onMessage: (message) => {
       console.log("Message received:", message);
+      try {
+        // push into the shared ConversationContext and dispatch DOM event for backward compat
+        conversationContext.pushIncoming(message);
+      } catch (e) {
+        // fallback to DOM event if context not ready
+        try {
+          window.dispatchEvent(new CustomEvent("tavoc:message", { detail: { message } }));
+        } catch (err) {
+          // ignore
+        }
+      }
     },
   });
+
+  const conversationContext = useConversationContext();
+
+  // set the conversation into the shared context when the underlying object changes
+  useEffect(() => {
+    conversationContext.setConversation(conversation);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation]);
 
   const startConversation = async () => {
     try {
