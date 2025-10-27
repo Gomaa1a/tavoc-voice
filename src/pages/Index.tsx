@@ -1,4 +1,5 @@
 import { VoiceAgent } from "@/components/VoiceAgent";
+import Chat from "@/components/Chat";
 import { GraduationCap, Brain, Headphones } from "lucide-react";
 
 const Index = () => {
@@ -36,6 +37,11 @@ const Index = () => {
           {/* Voice Agent */}
           <div className="mb-16">
             <VoiceAgent />
+          </div>
+
+          {/* Chat */}
+          <div className="mb-16">
+            <Chat />
           </div>
 
           {/* Features */}
