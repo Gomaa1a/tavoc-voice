@@ -84,10 +84,11 @@ export const Chat: React.FC = () => {
       let replyText = "";
       try {
         const data = await res.json();
-        if (typeof data === "string") replyText = data;
-        else if (data.reply) replyText = data.reply;
-        else if (data.message) replyText = data.message;
-        else if (data.text) replyText = data.text;
+  if (typeof data === "string") replyText = data;
+  else if (data.output) replyText = data.output;
+  else if (data.reply) replyText = data.reply;
+  else if (data.message) replyText = data.message;
+  else if (data.text) replyText = data.text;
         else replyText = JSON.stringify(data);
       } catch (e) {
         // not json — try plain text
