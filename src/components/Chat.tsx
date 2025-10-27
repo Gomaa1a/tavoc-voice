@@ -16,6 +16,7 @@ type Message = {
 export const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const send = () => {
@@ -37,6 +38,7 @@ export const Chat: React.FC = () => {
     }
 
     (async () => {
+      setIsSending(true);
       const { sendText } = useConversationContext();
       // set a small local sending state (optional UX) — keep simple: disable button via attribute
       try {
@@ -93,6 +95,9 @@ export const Chat: React.FC = () => {
         setMessages((s) => [...s, botMsg]);
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
       }
+      finally {
+        setIsSending(false);
+      }
     })();
   };
 
@@ -136,9 +141,9 @@ export const Chat: React.FC = () => {
       </div>
 
       <div className="flex gap-2 items-end">
-        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type a message..." />
-        <Button onClick={send} size="sm">
-          Send
+        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type a message..." disabled={isSending} />
+        <Button onClick={send} size="sm" disabled={isSending}>
+          {isSending ? "Sending..." : "Send"}
         </Button>
       </div>
     </div>
