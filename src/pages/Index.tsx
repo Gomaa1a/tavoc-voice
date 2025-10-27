@@ -1,5 +1,7 @@
 import { VoiceAgent } from "@/components/VoiceAgent";
 import Chat from "@/components/Chat";
+import Dashboard from "@/components/Dashboard";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GraduationCap, Brain, Headphones } from "lucide-react";
 
 const Index = () => {
@@ -34,14 +36,32 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Voice Agent */}
           <div className="mb-16">
-            <VoiceAgent />
-          </div>
+            <Tabs defaultValue="voice">
+              <TabsList>
+                <TabsTrigger value="voice">Voice</TabsTrigger>
+                <TabsTrigger value="chat">Chat</TabsTrigger>
+                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              </TabsList>
 
-          {/* Chat */}
-          <div className="mb-16">
-            <Chat />
+              <TabsContent value="voice">
+                <div className="py-6">
+                  <VoiceAgent />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="chat">
+                <div className="py-6">
+                  <Chat />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="dashboard">
+                <div className="py-6">
+                  <Dashboard />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Features */}
