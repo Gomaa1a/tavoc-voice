@@ -18,8 +18,9 @@ export const Chat: React.FC = () => {
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const { sendText } = useConversationContext();
 
-  const send = () => {
+  const send = async () => {
     if (!draft.trim()) return;
     const userMsg: Message = {
       id: String(Date.now()) + "-u",
@@ -27,8 +28,11 @@ export const Chat: React.FC = () => {
       text: draft.trim(),
       time: new Date().toLocaleTimeString(),
     };
+
+    // Optimistically add the user message and clear draft
     setMessages((s) => [...s, userMsg]);
     setDraft("");
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
 
     // Dispatch outgoing event for Dashboard/telemetry
     try {
@@ -37,68 +41,62 @@ export const Chat: React.FC = () => {
       // ignore
     }
 
-    (async () => {
-      setIsSending(true);
-      const { sendText } = useConversationContext();
-      // set a small local sending state (optional UX) — keep simple: disable button via attribute
+    setIsSending(true);
+    try {
+      // Try sending via conversation/context (best-effort)
       try {
-        // Try sending via conversation/context
         await sendText(userMsg.text);
       } catch (e) {
         console.warn("sendText failed", e);
       }
 
-      // Also post to the provided webhook and display the response
+      // Post to the provided webhook and display the response (await the reply)
       const WEBHOOK = "https://ahmedgomaaseekers.app.n8n.cloud/webhook/6abf4300-8865-417e-820c-9eb5672d6319/chat";
+      const res = await fetch(WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: userMsg.text }),
+      });
+
+      let replyText = "";
       try {
-        const res = await fetch(WEBHOOK, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: userMsg.text }),
-        });
-
-        let replyText = "";
+        const data = await res.json();
+        if (typeof data === "string") replyText = data;
+        else if (data.reply) replyText = data.reply;
+        else if (data.message) replyText = data.message;
+        else if (data.text) replyText = data.text;
+        else replyText = JSON.stringify(data);
+      } catch (e) {
+        // not json — try plain text
         try {
-          const data = await res.json();
-          // try common fields
-          if (typeof data === "string") replyText = data;
-          else if (data.reply) replyText = data.reply;
-          else if (data.message) replyText = data.message;
-          else if (data.text) replyText = data.text;
-          else replyText = JSON.stringify(data);
-        } catch (e) {
-          // not json — try plain text
-          try {
-            replyText = await res.text();
-          } catch (er) {
-            replyText = "(no response)";
-          }
+          replyText = await res.text();
+        } catch (er) {
+          replyText = "(no response)";
         }
+      }
 
-        const botMsg: Message = {
-          id: String(Date.now()) + "-b",
-          sender: "bot",
-          text: replyText || `No reply from webhook (status ${res.status})`,
-          time: new Date().toLocaleTimeString(),
-        };
-        setMessages((s) => [...s, botMsg]);
-        listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-      } catch (err) {
-        console.warn("Webhook call failed", err);
-        // fallback echo
-        const botMsg: Message = {
-          id: String(Date.now()) + "-b",
-          sender: "bot",
-          text: `Echo: ${userMsg.text}`,
-          time: new Date().toLocaleTimeString(),
-        };
-        setMessages((s) => [...s, botMsg]);
-        listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-      }
-      finally {
-        setIsSending(false);
-      }
-    })();
+      const botMsg: Message = {
+        id: String(Date.now()) + "-b",
+        sender: "bot",
+        text: replyText || `No reply from webhook (status ${res.status})`,
+        time: new Date().toLocaleTimeString(),
+      };
+      setMessages((s) => [...s, botMsg]);
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    } catch (err) {
+      console.warn("Webhook call failed", err);
+      // fallback echo
+      const botMsg: Message = {
+        id: String(Date.now()) + "-b",
+        sender: "bot",
+        text: `Echo: ${userMsg.text}`,
+        time: new Date().toLocaleTimeString(),
+      };
+      setMessages((s) => [...s, botMsg]);
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   // Listen for incoming messages from the voice agent (published by VoiceAgent)
