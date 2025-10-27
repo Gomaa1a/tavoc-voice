@@ -102,7 +102,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="container mx-auto px-6 py-8 mt-16 border-t border-border">
         <p className="text-center text-muted-foreground">
-          © 2025 TAVOC Academy. Powered by advanced AI voice technology.
+          © 2025 TAVOC Academy. powered by SEEKERS
         </p>
       </footer>
     </div>
