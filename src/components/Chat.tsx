@@ -18,7 +18,29 @@ export const Chat: React.FC = () => {
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const { sendText } = useConversationContext();
+  const { sendText, conversation } = useConversationContext();
+
+  // Derive a session id to send to the webhook for agent memory.
+  // Prefer an id from the active conversation object; otherwise persist a generated id.
+  const getSessionId = (): string => {
+    // try common fields on SDK conversation objects
+    const c: any = conversation;
+    const maybe = c?.id || c?.sessionId || c?.conversationId || c?.session_id || c?.conversation_id;
+    if (maybe) return String(maybe);
+
+    // fallback: persistent client-side session id
+    const KEY = "tavoc:session_id";
+    let sid = localStorage.getItem(KEY);
+    if (!sid) {
+      sid = String(Date.now()) + "-" + Math.random().toString(36).slice(2, 9);
+      try {
+        localStorage.setItem(KEY, sid);
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
+    return sid;
+  };
 
   const send = async () => {
     if (!draft.trim()) return;
@@ -52,10 +74,11 @@ export const Chat: React.FC = () => {
 
       // Post to the provided webhook and display the response (await the reply)
       const WEBHOOK = "https://ahmedgomaaseekers.app.n8n.cloud/webhook/6abf4300-8865-417e-820c-9eb5672d6319/chat";
+      const sessionId = getSessionId();
       const res = await fetch(WEBHOOK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: userMsg.text }),
+        body: JSON.stringify({ text: userMsg.text, sessionID: sessionId }),
       });
 
       let replyText = "";
