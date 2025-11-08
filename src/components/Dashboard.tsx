@@ -75,6 +75,63 @@ export const Dashboard: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   }, [entries]);
 
+  // Remote calls fetched from ElevenLabs convai API
+  const [remoteCalls, setRemoteCalls] = useState<any[] | null>(null);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+
+  const fetchRemoteCalls = async (params?: {
+    call_successful?: string;
+    user_id?: string;
+    agent_id?: string;
+    summary_mode?: string;
+    call_start_after_unix?: string | number;
+    call_start_before_unix?: string | number;
+  }) => {
+    setRemoteLoading(true);
+    setRemoteError(null);
+    try {
+      const url = new URL("https://api.elevenlabs.io/v1/convai/conversations");
+      const search = new URLSearchParams();
+      // apply params or defaults like the curl example
+      search.set("call_successful", params?.call_successful ?? "");
+      search.set("user_id", params?.user_id ?? "");
+      search.set("agent_id", params?.agent_id ?? "");
+      search.set("summary_mode", params?.summary_mode ?? "exclude");
+      search.set("call_start_after_unix", String(params?.call_start_after_unix ?? 0));
+      search.set("call_start_before_unix", String(params?.call_start_before_unix ?? 0));
+      url.search = search.toString();
+
+      const res = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          // NOTE: the API key was provided in the request; it's used client-side here.
+          "xi-api-key": "2d5356ea7439972c34803fd55b65183667d163ee2b0ad8a2e5117ee445d05f0a",
+          Accept: "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Status ${res.status} ${text}`);
+      }
+      const data = await res.json();
+      // Expecting an array or an object with results; normalize to array
+      let items: any[] = [];
+      if (Array.isArray(data)) items = data;
+      else if (Array.isArray(data.results)) items = data.results;
+      else if (Array.isArray(data.conversations)) items = data.conversations;
+      else items = [data];
+      setRemoteCalls(items);
+    } catch (e: any) {
+      console.error("fetchRemoteCalls error", e);
+      setRemoteError(String(e?.message ?? e));
+      setRemoteCalls(null);
+    } finally {
+      setRemoteLoading(false);
+    }
+  };
+
   useEffect(() => {
     const onIncoming = (e: Event) => {
       const detail: any = (e as CustomEvent).detail;
@@ -117,6 +174,15 @@ export const Dashboard: React.FC = () => {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  const refreshLocal = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      setEntries(raw ? JSON.parse(raw) : []);
+    } catch (e) {
+      // ignore
+    }
+  };
+
   return (
     <div className="p-4 bg-card border border-input rounded-2xl shadow-card">
       <div className="flex items-center justify-between mb-4">
@@ -135,21 +201,73 @@ export const Dashboard: React.FC = () => {
       {/* Webhook display and actions */}
       <WebhookPanel />
 
-      <div className="space-y-3 max-h-72 overflow-y-auto">
-        {entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No calls or messages recorded yet.</p>
+      <div className="mb-3 flex items-center gap-2">
+        <Button size="sm" onClick={refreshLocal}>Refresh Local</Button>
+        <Button size="sm" onClick={() => fetchRemoteCalls()}>{remoteLoading ? "Loading..." : "Fetch Remote Calls"}</Button>
+        {remoteError && <div className="text-xs text-destructive">{remoteError}</div>}
+      </div>
+
+      {/* Local entries table */}
+      <div className="overflow-x-auto mb-4">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
+            <tr className="text-left text-sm text-muted-foreground">
+              <th className="p-2 w-24">Time</th>
+              <th className="p-2">Type</th>
+              <th className="p-2">Source</th>
+              <th className="p-2">Text</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr><td colSpan={4} className="p-2 text-sm text-muted-foreground">No local calls/messages.</td></tr>
+            ) : (
+              entries.map((e) => (
+                <tr key={e.id} className="border-t">
+                  <td className="p-2 text-xs">{e.time}</td>
+                  <td className="p-2 text-sm">{e.kind}</td>
+                  <td className="p-2 text-sm">{e.source}</td>
+                  <td className="p-2 text-sm break-words whitespace-pre-wrap">{e.text}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Remote calls table */}
+      <div>
+        <h4 className="text-sm font-semibold mb-2">Remote Calls</h4>
+        {remoteLoading && <div className="text-sm text-muted-foreground mb-2">Loading remote calls…</div>}
+        {remoteCalls == null ? (
+          <div className="text-sm text-muted-foreground">No remote data loaded. Click "Fetch Remote Calls".</div>
         ) : (
-          entries.map((e) => (
-            <div key={e.id} className="p-3 rounded-lg bg-background border">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">
-                  {e.kind === "incoming" ? "Response" : "Request"} • {e.source}
-                </div>
-                <div className="text-xs text-muted-foreground">{e.time}</div>
-              </div>
-              <div className="mt-2 text-sm text-foreground whitespace-pre-wrap">{e.text}</div>
-            </div>
-          ))
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed border-collapse">
+              <thead>
+                <tr className="text-left text-sm text-muted-foreground">
+                  <th className="p-2 w-28">ID</th>
+                  <th className="p-2 w-32">User</th>
+                  <th className="p-2 w-32">Agent</th>
+                  <th className="p-2">Start</th>
+                  <th className="p-2">Successful</th>
+                  <th className="p-2">Summary / Raw</th>
+                </tr>
+              </thead>
+              <tbody>
+                {remoteCalls.map((c: any, idx: number) => (
+                  <tr key={c.id ?? idx} className="border-t">
+                    <td className="p-2 text-xs">{c.id ?? c.conversation_id ?? c.conversationId ?? "-"}</td>
+                    <td className="p-2 text-sm">{c.user_id ?? c.userId ?? c.user ?? "-"}</td>
+                    <td className="p-2 text-sm">{c.agent_id ?? c.agentId ?? c.agent ?? "-"}</td>
+                    <td className="p-2 text-sm">{c.call_start_unix ? new Date(c.call_start_unix * 1000).toLocaleString() : (c.call_start ? String(c.call_start) : "-")}</td>
+                    <td className="p-2 text-sm">{String(c.call_successful ?? c.success ?? "-")}</td>
+                    <td className="p-2 text-sm break-words whitespace-pre-wrap">{c.summary ?? c.summary_text ?? JSON.stringify(c).slice(0, 400)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
