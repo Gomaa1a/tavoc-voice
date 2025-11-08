@@ -2,6 +2,54 @@
 // Listens to window events fired by VoiceAgent and Chat and stores entries in localStorage.
 
 import React, { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+
+// Webhook to display on the dashboard (configured by the user request)
+const DEFAULT_WEBHOOK = "https://ahmedgomaaseekers.app.n8n.cloud/webhook/c0ddafb0-ea84-4585-8d42-d4ce91d15980";
+
+const WebhookPanel: React.FC = () => {
+  const [status, setStatus] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("Copied to clipboard");
+      setTimeout(() => setStatus(null), 2000);
+    } catch (e) {
+      setStatus("Copy failed");
+      setTimeout(() => setStatus(null), 2000);
+    }
+  };
+
+  // Sends a request to the webhook to fetch a list or notify; here it's a ping for demo
+  const ping = async () => {
+    setSending(true);
+    try {
+      const res = await fetch(DEFAULT_WEBHOOK, { method: "GET" });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setStatus("Webhook reachable");
+    } catch (e) {
+      setStatus("Webhook call failed");
+    } finally {
+      setSending(false);
+      setTimeout(() => setStatus(null), 2500);
+    }
+  };
+
+  return (
+    <div className="mb-4 px-3 py-2 rounded-md bg-muted/40 border">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm break-all">Webhook: <a className="text-primary underline" href={DEFAULT_WEBHOOK} target="_blank" rel="noreferrer">{DEFAULT_WEBHOOK}</a></div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => copy(DEFAULT_WEBHOOK)} disabled={sending}>Copy</Button>
+          <Button size="sm" variant="outline" onClick={ping} disabled={sending}>{sending ? "Pinging..." : "Ping"}</Button>
+        </div>
+      </div>
+      {status && <div className="text-xs text-muted-foreground mt-2">{status}</div>}
+    </div>
+  );
+};
 
 type Entry = {
   id: string;
@@ -83,6 +131,9 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Webhook display and actions */}
+      <WebhookPanel />
 
       <div className="space-y-3 max-h-72 overflow-y-auto">
         {entries.length === 0 ? (
