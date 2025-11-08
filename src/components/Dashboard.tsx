@@ -42,11 +42,57 @@ const WebhookPanel: React.FC = () => {
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm break-all">Webhook: <a className="text-primary underline" href={DEFAULT_WEBHOOK} target="_blank" rel="noreferrer">{DEFAULT_WEBHOOK}</a></div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => copy(DEFAULT_WEBHOOK)} disabled={sending}>Copy</Button>
-          <Button size="sm" variant="outline" onClick={ping} disabled={sending}>{sending ? "Pinging..." : "Ping"}</Button>
+            <Button size="sm" onClick={() => copy(DEFAULT_WEBHOOK)} disabled={sending}>Copy</Button>
+            <Button size="sm" variant="outline" onClick={ping} disabled={sending}>{sending ? "Pinging..." : "Ping"}</Button>
         </div>
       </div>
       {status && <div className="text-xs text-muted-foreground mt-2">{status}</div>}
+    </div>
+  );
+};
+
+// Button component that triggers the n8n webhook-test URL and returns its JSON to the caller
+const RUN_WEBHOOK_URL = "https://ahmedgomaaseekers.app.n8n.cloud/webhook-test/c0ddafb0-ea84-4585-8d42-d4ce91d15980";
+
+const RunWebhookButton: React.FC<{ onResult: (data: any[]) => void; disabled?: boolean }> = ({ onResult, disabled }) => {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      // POST an optional payload. Here we send an empty object — change as needed.
+      const res = await fetch(RUN_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = await res.json();
+      // Normalize result into an array if not already
+      let items: any[] = [];
+      if (Array.isArray(data)) items = data;
+      else if (Array.isArray(data.results)) items = data.results;
+      else if (Array.isArray(data.items)) items = data.items;
+      else items = [data];
+      onResult(items);
+      setStatus("Webhook returned data");
+    } catch (e: any) {
+      setStatus(`Webhook failed: ${String(e?.message ?? e)}`);
+    } finally {
+      setBusy(false);
+      setTimeout(() => setStatus(null), 2500);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="secondary" onClick={run} disabled={disabled || busy}>
+        {busy ? "Running..." : "Run Webhook"}
+      </Button>
+      {status && <div className="text-xs text-muted-foreground">{status}</div>}
     </div>
   );
 };
@@ -204,6 +250,7 @@ export const Dashboard: React.FC = () => {
       <div className="mb-3 flex items-center gap-2">
         <Button size="sm" onClick={refreshLocal}>Refresh Local</Button>
         <Button size="sm" onClick={() => fetchRemoteCalls()}>{remoteLoading ? "Loading..." : "Fetch Remote Calls"}</Button>
+        <RunWebhookButton onResult={(data: any[]) => setRemoteCalls(data)} disabled={remoteLoading} />
         {remoteError && <div className="text-xs text-destructive">{remoteError}</div>}
       </div>
 
