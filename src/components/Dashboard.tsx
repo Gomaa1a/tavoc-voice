@@ -2,8 +2,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-const RUN_WEBHOOK_URL = "https://ahmedgomaaseekers.app.n8n.cloud/webhook-test/c0ddafb0-ea84-4585-8d42-d4ce91d15980";
-const AUDIO_ENDPOINT = "https://ahmedgomaaseekers.app.n8n.cloud/webhook/get-audio?conversation_id=";
+const RUN_WEBHOOK_URL = "/api/calls";
+const RUN_WEBHOOK_RUN = "/api/run";
+const AUDIO_ENDPOINT = "/api/audio/";
 
 type RawAny = any;
 type CallRow = { id: string | null; time: string; from: string; to: string; duration: string | number };
@@ -62,9 +63,9 @@ export const Dashboard: React.FC = () => {
       const res = await fetch(RUN_WEBHOOK_URL, { method: 'GET', cache: 'no-cache' });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = await res.json();
-      const items = normalizeResponse(data);
-      setRows(items);
-      setStatusMsg(`Loaded ${items.length} rows`);
+      // server already returns normalized rows
+      setRows(data ?? []);
+      setStatusMsg(`Loaded ${Array.isArray(data) ? data.length : 0} rows`);
     } catch (e: any) {
       console.error(e);
       setStatusMsg(String(e?.message ?? e), true);
@@ -77,12 +78,11 @@ export const Dashboard: React.FC = () => {
     setLoading(true);
     setStatusMsg('Running webhook test...');
     try {
-      const res = await fetch(RUN_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true }) });
+      const res = await fetch(RUN_WEBHOOK_RUN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true }) });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = await res.json();
-      const items = normalizeResponse(data);
-      setRows(items);
-      setStatusMsg(`Webhook returned ${items.length} rows`);
+      setRows(data ?? []);
+      setStatusMsg(`Webhook returned ${Array.isArray(data) ? data.length : 0} rows`);
     } catch (e: any) {
       console.error(e);
       setStatusMsg(String(e?.message ?? e), true);
