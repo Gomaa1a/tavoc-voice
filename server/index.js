@@ -11,6 +11,10 @@ const PORT = process.env.PORT || 4000;
 const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://ahmedgomaaseekers.app.n8n.cloud/webhook/c0ddafb0-ea84-4585-8d42-d4ce91d15980';
 const AUDIO_URL = process.env.AUDIO_URL || 'https://ahmedgomaaseekers.app.n8n.cloud/webhook/get-audio?conversation_id=';
 
+// Simple in-memory cache for /api/calls responses to reduce load
+const CACHE_TTL = Number(process.env.CACHE_TTL_SECONDS ?? 30); // seconds
+let cache = { ts: 0, data: null };
+
 function normalizeItem(raw) {
   const id = raw.id ?? raw.conversation_id ?? raw.conversationId ?? raw.conversation ?? raw._id ?? null;
   const timeRaw = raw.started_at ?? raw.created_at ?? raw.timestamp ?? raw.call_start_unix ?? raw.call_start ?? raw.start_time ?? raw.time ?? null;
@@ -44,6 +48,12 @@ function normalizeResponse(data) {
 
 app.get('/api/calls', async (req, res) => {
   try {
+    // Simple cache check
+    const now = Date.now();
+    if (cache.data && (now - cache.ts) / 1000 < CACHE_TTL) {
+      return res.json(cache.data);
+    }
+
     // Forward GET to configured webhook (n8n may not return history; this is best-effort)
     const url = new URL(WEBHOOK_URL);
     // copy query params
@@ -52,6 +62,8 @@ app.get('/api/calls', async (req, res) => {
     if (!resp.ok) return res.status(resp.status).send(await resp.text());
     const data = await resp.json();
     const items = normalizeResponse(data);
+    // update cache
+    cache = { ts: Date.now(), data: items };
     res.json(items);
   } catch (e) {
     console.error('GET /api/calls error', e);

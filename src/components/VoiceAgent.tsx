@@ -63,9 +63,18 @@ export const VoiceAgent = () => {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
       // Start the conversation with the agent ID (WebSocket connection for public agents)
+      // Using Hamsa provider: read origin/api key from Vite env if available, otherwise fall back
+      // to the provided values. The conversation.startSession supports passing origin and
+      // authorization which the underlying WebSocket client will use to build the connection.
+      const HAMSA_AGENT_ID = "09d1114c-6a0a-462b-acf6-4a824d9eb513"; // new agent id
+      const HAMSA_API_KEY = (import.meta.env.VITE_HAMSA_API_KEY as string) || "fabda757-a226-49ce-9444-56ee0235303d";
+      const HAMSA_ORIGIN = (import.meta.env.VITE_HAMSA_ORIGIN as string) || "wss://api.hamsa.example";
+
       await conversation.startSession({
-        agentId: "agent_3601k8g6nqaxfx29qtpaj0kbammc",
+        agentId: HAMSA_AGENT_ID,
         connectionType: "websocket",
+        origin: HAMSA_ORIGIN,
+        authorization: HAMSA_API_KEY,
       });
     } catch (error) {
       console.error("Failed to start conversation:", error);
